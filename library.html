@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document Library - ComplianceReader</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: #f5f7fa;
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .header {
+      max-width: 1200px;
+      margin: 0 auto 40px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .header h1 {
+      font-size: 32px;
+      color: #333;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 16px;
+    }
+
+    .nav-link {
+      padding: 10px 20px;
+      background: white;
+      color: #667eea;
+      text-decoration: none;
+      border-radius: 8px;
+      font-weight: 500;
+      transition: all 0.2s;
+      border: 2px solid #667eea;
+    }
+
+    .nav-link:hover {
+      background: #667eea;
+      color: white;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 24px;
+    }
+
+    .doc-card {
+      background: white;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      transition: all 0.3s;
+      cursor: pointer;
+      text-decoration: none;
+      color: inherit;
+      display: block;
+    }
+
+    .doc-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+    }
+
+    .doc-thumbnail {
+      height: 180px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 64px;
+      color: white;
+    }
+
+    .doc-content {
+      padding: 20px;
+    }
+
+    .doc-title {
+      font-size: 18px;
+      font-weight: 600;
+      color: #333;
+      margin-bottom: 8px;
+      line-height: 1.4;
+    }
+
+    .doc-meta {
+      display: flex;
+      gap: 16px;
+      font-size: 14px;
+      color: #666;
+      margin-bottom: 12px;
+    }
+
+    .doc-description {
+      font-size: 14px;
+      color: #666;
+      line-height: 1.6;
+      margin-bottom: 16px;
+    }
+
+    .doc-stats {
+      display: flex;
+      gap: 16px;
+      padding-top: 16px;
+      border-top: 1px solid #eee;
+    }
+
+    .stat {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      color: #666;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 60px;
+      color: #666;
+      font-size: 18px;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 80px 20px;
+      background: white;
+      border-radius: 12px;
+    }
+
+    .empty-icon {
+      font-size: 64px;
+      margin-bottom: 16px;
+    }
+
+    @media (max-width: 768px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+
+      .header {
+        flex-direction: column;
+        gap: 16px;
+        text-align: center;
+      }
+
+      .nav-links {
+        width: 100%;
+        flex-direction: column;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>📚 Document Library</h1>
+    <div class="nav-links">
+      <a href="dashboard.html" class="nav-link">📊 Dashboard</a>
+      <a href="index.html" class="nav-link">← Home</a>
+    </div>
+  </div>
+
+  <div class="container">
+    <div id="loading" class="loading">
+      Loading documents...
+    </div>
+
+    <div id="grid" class="grid" style="display: none;"></div>
+  </div>
+
+  <script>
+    // ============================================================================
+    // CONFIGURATION
+    // ============================================================================
+    const SUPABASE_URL = 'https://tbkdigmhjtnibqfgmptq.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRia2RpZ21oanRuaWJxZmdtcHRxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjkxNzQ4MTIsImV4cCI6MjA0NDc1MDgxMn0.bSPhsbg-tZP4gKwaSfV8Qvwmvs6mUOJE_5y_jfuLFh8';
+
+    let supabaseClient;
+
+    // Document icons mapping
+    const docIcons = {
+      'Ethics & Compliance': '⚖️',
+      'Data Privacy': '🔒',
+      'Security': '🛡️',
+      'HR Policies': '👥',
+      'Financial Compliance': '💰',
+      'default': '📄'
+    };
+
+    // ============================================================================
+    // INITIALIZE
+    // ============================================================================
+    
+    function initSupabase() {
+      try {
+        if (typeof window.supabase === 'undefined') {
+          throw new Error('Supabase library not loaded');
+        }
+        supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        console.log('✅ Supabase client initialized');
+        return true;
+      } catch (err) {
+        console.error('❌ Failed to initialize Supabase:', err);
+        return false;
+      }
+    }
+
+    // ============================================================================
+    // LOAD DOCUMENTS
+    // ============================================================================
+
+    async function loadDocuments() {
+      try {
+        console.log('📚 Loading documents...');
+
+        // Get all active documents
+        const { data: documents, error } = await supabaseClient
+          .from('documents')
+          .select('*')
+          .eq('status', 'active')
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          console.error('Error loading documents:', error);
+          throw error;
+        }
+
+        console.log(`✅ Loaded ${documents?.length || 0} documents`);
+
+        // Get assignment stats for each document
+        const { data: assignments } = await supabaseClient
+          .from('document_assignments')
+          .select('document_id, status');
+
+        // Render documents
+        renderDocuments(documents, assignments || []);
+
+      } catch (error) {
+        console.error('❌ Error loading documents:', error);
+        document.getElementById('loading').innerHTML = `
+          <div class="empty-state">
+            <div class="empty-icon">⚠️</div>
+            <h3>Error Loading Documents</h3>
+            <p>${error.message}</p>
+          </div>
+        `;
+      }
+    }
+
+    // ============================================================================
+    // RENDER DOCUMENTS
+    // ============================================================================
+
+    function renderDocuments(documents, assignments) {
+      const grid = document.getElementById('grid');
+      const loading = document.getElementById('loading');
+
+      loading.style.display = 'none';
+      grid.style.display = 'grid';
+
+      if (!documents || documents.length === 0) {
+        grid.innerHTML = `
+          <div class="empty-state" style="grid-column: 1/-1;">
+            <div class="empty-icon">📚</div>
+            <h3>No documents available</h3>
+            <p>Load demo data to see sample compliance documents.</p>
+          </div>
+        `;
+        return;
+      }
+
+      grid.innerHTML = documents.map(doc => {
+        // Get stats for this document
+        const docAssignments = assignments.filter(a => a.document_id === doc.id);
+        const completed = docAssignments.filter(a => a.status === 'completed').length;
+        const total = docAssignments.length;
+        const completionRate = total > 0 ? Math.round((completed / total) * 100) : 0;
+
+        const icon = docIcons[doc.category] || docIcons['default'];
+
+        return `
+          <a href="reader.html?doc=${doc.slug}" class="doc-card">
+            <div class="doc-thumbnail">
+              ${icon}
+            </div>
+            <div class="doc-content">
+              <div class="doc-title">${doc.title}</div>
+              <div class="doc-meta">
+                <span>${doc.category || 'General'}</span>
+                <span>•</span>
+                <span>${doc.total_pages || 0} pages</span>
+              </div>
+              <div class="doc-description">
+                ${doc.description || 'Click to read this compliance document.'}
+              </div>
+              <div class="doc-stats">
+                <div class="stat">
+                  <span>📊</span>
+                  <span>${completionRate}% completion</span>
+                </div>
+                <div class="stat">
+                  <span>👥</span>
+                  <span>${total} assigned</span>
+                </div>
+              </div>
+            </div>
+          </a>
+        `;
+      }).join('');
+    }
+
+    // ============================================================================
+    // INIT
+    // ============================================================================
+
+    document.addEventListener('DOMContentLoaded', () => {
+      console.log('🚀 Library initializing...');
+      
+      setTimeout(() => {
+        if (initSupabase()) {
+          loadDocuments();
+        }
+      }, 100);
+    });
+  </script>
+</body>
+</html>

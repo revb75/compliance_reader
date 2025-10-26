@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Analytics Dashboard - ComplianceReader</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+      padding: 40px;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 40px;
+      padding-bottom: 20px;
+      border-bottom: 2px solid #f0f0f0;
+    }
+
+    .header h1 {
+      font-size: 32px;
+      color: #333;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .logo {
+      font-size: 36px;
+    }
+
+    .back-link {
+      color: #667eea;
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 500;
+      transition: color 0.2s;
+    }
+
+    .back-link:hover {
+      color: #764ba2;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 24px;
+      margin-bottom: 40px;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 28px;
+      border-radius: 12px;
+      box-shadow: 0 4px 16px rgba(102, 126, 234, 0.3);
+      transition: transform 0.2s;
+    }
+
+    .stat-card:hover {
+      transform: translateY(-4px);
+    }
+
+    .stat-card h3 {
+      font-size: 14px;
+      font-weight: 500;
+      opacity: 0.9;
+      margin-bottom: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .stat-card .number {
+      font-size: 42px;
+      font-weight: bold;
+      margin-bottom: 8px;
+    }
+
+    .stat-card .label {
+      font-size: 13px;
+      opacity: 0.8;
+    }
+
+    .section {
+      margin-bottom: 40px;
+    }
+
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+    }
+
+    .section h2 {
+      font-size: 24px;
+      color: #333;
+    }
+
+    .button {
+      background: #667eea;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-size: 14px;
+    }
+
+    .button:hover {
+      background: #764ba2;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    }
+
+    .button.secondary {
+      background: #f0f0f0;
+      color: #333;
+    }
+
+    .button.secondary:hover {
+      background: #e0e0e0;
+    }
+
+    .documents-grid {
+      display: grid;
+      gap: 16px;
+    }
+
+    .document-card {
+      background: #f8f9fa;
+      border-radius: 8px;
+      padding: 20px;
+      border-left: 4px solid #667eea;
+      transition: all 0.2s;
+    }
+
+    .document-card:hover {
+      background: #f0f2f5;
+      transform: translateX(4px);
+    }
+
+    .document-title {
+      font-size: 18px;
+      font-weight: 600;
+      color: #333;
+      margin-bottom: 8px;
+    }
+
+    .document-meta {
+      display: flex;
+      gap: 16px;
+      color: #666;
+      font-size: 14px;
+      margin-bottom: 12px;
+    }
+
+    .progress-bar {
+      background: #e0e0e0;
+      height: 8px;
+      border-radius: 4px;
+      overflow: hidden;
+      margin-bottom: 8px;
+    }
+
+    .progress-fill {
+      background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+      height: 100%;
+      transition: width 0.3s;
+    }
+
+    .progress-text {
+      font-size: 13px;
+      color: #666;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 60px;
+      color: #666;
+      font-size: 18px;
+    }
+
+    .error {
+      background: #fee;
+      border: 2px solid #fcc;
+      border-radius: 8px;
+      padding: 20px;
+      color: #c33;
+      margin: 20px 0;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: #999;
+    }
+
+    .empty-state-icon {
+      font-size: 64px;
+      margin-bottom: 16px;
+    }
+
+    @media (max-width: 768px) {
+      .container {
+        padding: 20px;
+      }
+
+      .header h1 {
+        font-size: 24px;
+      }
+
+      .stats-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>
+        <span class="logo">📊</span>
+        Analytics Dashboard
+      </h1>
+      <a href="index.html" class="back-link">
+        ← Back to Home
+      </a>
+    </div>
+
+    <div id="loading" class="loading">
+      Loading dashboard data...
+    </div>
+
+    <div id="error" style="display: none;"></div>
+
+    <div id="content" style="display: none;">
+      <!-- Stats Cards -->
+      <div class="stats-grid">
+        <div class="stat-card">
+          <h3>Total Documents</h3>
+          <div class="number" id="totalDocs">-</div>
+          <div class="label">Active compliance documents</div>
+        </div>
+
+        <div class="stat-card">
+          <h3>Assignments</h3>
+          <div class="number" id="totalAssignments">-</div>
+          <div class="label">Total document assignments</div>
+        </div>
+
+        <div class="stat-card">
+          <h3>Completion Rate</h3>
+          <div class="number" id="completionRate">-</div>
+          <div class="label">Overall compliance rate</div>
+        </div>
+
+        <div class="stat-card">
+          <h3>Active Users</h3>
+          <div class="number" id="activeUsers">-</div>
+          <div class="label">Employees in system</div>
+        </div>
+      </div>
+
+      <!-- Comprehension Analytics -->
+      <div class="section">
+        <div class="section-header">
+          <h2>📊 Comprehension Analytics</h2>
+        </div>
+        <div id="comprehensionGrid" style="display: grid; gap: 16px;"></div>
+      </div>
+
+      <!-- Documents Section -->
+      <div class="section">
+        <div class="section-header">
+          <h2>Documents</h2>
+          <div style="display: flex; gap: 12px;">
+            <button class="button secondary" onclick="loadDashboard()">Refresh</button>
+            <button class="button" onclick="window.location.href='library.html'">+ Add Document</button>
+          </div>
+        </div>
+        <div id="documentsList" class="documents-grid"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ============================================================================
+    // CONFIGURATION
+    // ============================================================================
+    // Replace with your Supabase credentials
+    const SUPABASE_URL = 'https://tbkdigmhjtnibqfgmptq.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRia2RpZ21oanRuaWJxZmdtcHRxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjkxNzQ4MTIsImV4cCI6MjA0NDc1MDgxMn0.bSPhsbg-tZP4gKwaSfV8Qvwmvs6mUOJE_5y_jfuLFh8';
+
+    // Initialize Supabase client
+    let supabaseClient;
+    
+    // Wait for Supabase library to load
+    function initSupabase() {
+      try {
+        if (typeof window.supabase === 'undefined') {
+          throw new Error('Supabase library not loaded');
+        }
+        supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        console.log('✅ Supabase client initialized successfully');
+        return true;
+      } catch (err) {
+        console.error('❌ Failed to initialize Supabase:', err);
+        showError('Failed to connect to database. Please check your configuration.');
+        return false;
+      }
+    }
+
+    // ============================================================================
+    // HELPER FUNCTIONS
+    // ============================================================================
+
+    function showError(message) {
+      const errorDiv = document.getElementById('error');
+      errorDiv.innerHTML = `
+        <div class="error">
+          <strong>Error:</strong> ${message}
+        </div>
+      `;
+      errorDiv.style.display = 'block';
+      document.getElementById('loading').style.display = 'none';
+    }
+
+    function hideLoading() {
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('content').style.display = 'block';
+    }
+
+    // ============================================================================
+    // LOAD DASHBOARD DATA
+    // ============================================================================
+
+    async function loadDashboard() {
+      try {
+        console.log('📊 Loading dashboard data...');
+
+        if (!supabaseClient) {
+          throw new Error('Supabase client not initialized');
+        }
+
+        // Get all documents
+        const { data: documents, error: docsError } = await supabaseClient
+          .from('documents')
+          .select('*')
+          .eq('status', 'active')
+          .order('created_at', { ascending: false });
+
+        if (docsError) {
+          console.error('Documents error:', docsError);
+          throw docsError;
+        }
+
+        console.log(`✅ Loaded ${documents?.length || 0} documents`);
+
+        // Get all assignments
+        const { data: assignments, error: assignError } = await supabaseClient
+          .from('document_assignments')
+          .select('*');
+
+        if (assignError) {
+          console.error('Assignments error:', assignError);
+          throw assignError;
+        }
+
+        console.log(`✅ Loaded ${assignments?.length || 0} assignments`);
+
+        // Get all profiles (users)
+        const { data: profiles, error: profilesError } = await supabaseClient
+          .from('profiles')
+          .select('*')
+          .eq('is_active', true);
+
+        if (profilesError) {
+          console.error('Profiles error:', profilesError);
+          throw profilesError;
+        }
+
+        console.log(`✅ Loaded ${profiles?.length || 0} profiles`);
+
+        // Get comprehension data
+        const { data: comprehensionData, error: compError } = await supabaseClient
+          .from('page_analytics')
+          .select('document_id, page_number, metadata')
+          .not('metadata', 'is', null);
+
+        console.log(`✅ Loaded ${comprehensionData?.length || 0} comprehension records`);
+
+        // Calculate stats
+        const totalDocs = documents?.length || 0;
+        const totalAssignments = assignments?.length || 0;
+        const completedAssignments = assignments?.filter(a => a.status === 'completed').length || 0;
+        const completionRate = totalAssignments > 0 
+          ? Math.round((completedAssignments / totalAssignments) * 100) 
+          : 0;
+        const activeUsers = profiles?.length || 0;
+
+        // Update stats cards
+        document.getElementById('totalDocs').textContent = totalDocs;
+        document.getElementById('totalAssignments').textContent = totalAssignments;
+        document.getElementById('completionRate').textContent = completionRate + '%';
+        document.getElementById('activeUsers').textContent = activeUsers;
+
+        // Render comprehension analytics
+        renderComprehensionAnalytics(documents, comprehensionData || []);
+
+        // Render documents list
+        renderDocuments(documents, assignments);
+
+        hideLoading();
+        console.log('✅ Dashboard loaded successfully');
+
+      } catch (error) {
+        console.error('❌ Error loading dashboard:', error);
+        showError(error.message || 'Failed to load dashboard data');
+      }
+    }
+
+    // ============================================================================
+    // RENDER COMPREHENSION ANALYTICS
+    // ============================================================================
+
+    function renderComprehensionAnalytics(documents, comprehensionData) {
+      const container = document.getElementById('comprehensionGrid');
+
+      if (!documents || documents.length === 0) {
+        container.innerHTML = '<p style="color: #999;">No documents to analyze</p>';
+        return;
+      }
+
+      const emotionLabels = {
+        'confused': { emoji: '😕', label: 'Confused', color: '#e74c3c' },
+        'clarification': { emoji: '🤔', label: 'Need Clarification', color: '#f39c12' },
+        'following': { emoji: '📖', label: 'Following', color: '#3498db' },
+        'understood': { emoji: '✅', label: 'Clear', color: '#27ae60' },
+        'aha': { emoji: '💡', label: 'Aha Moment', color: '#f1c40f' },
+        'important': { emoji: '⚠️', label: 'Important', color: '#e67e22' },
+        'remember': { emoji: '🎯', label: 'Must Remember', color: '#c0392b' },
+        'excellent': { emoji: '✨', label: 'Excellent', color: '#ffd700' }
+      };
+
+      // Analyze each document
+      documents.forEach(doc => {
+        const docComprehension = comprehensionData.filter(c => 
+          c.document_id === doc.id && c.metadata?.comprehension
+        );
+
+        if (docComprehension.length === 0) return;
+
+        // Count emotions
+        const emotionCounts = {};
+        docComprehension.forEach(c => {
+          const emotion = c.metadata.comprehension;
+          emotionCounts[emotion] = (emotionCounts[emotion] || 0) + 1;
+        });
+
+        // Find most common emotions
+        const sorted = Object.entries(emotionCounts)
+          .sort(([,a], [,b]) => b - a)
+          .slice(0, 3);
+
+        const card = document.createElement('div');
+        card.className = 'document-card';
+        card.innerHTML = `
+          <div class="document-title">${doc.title}</div>
+          <div style="margin-top: 12px; font-size: 14px; color: #666;">
+            <strong>${docComprehension.length}</strong> comprehension markers
+          </div>
+          <div style="display: flex; gap: 12px; margin-top: 12px; flex-wrap: wrap;">
+            ${sorted.map(([emotion, count]) => {
+              const info = emotionLabels[emotion] || { emoji: '❓', label: emotion, color: '#999' };
+              return `
+                <div style="
+                  display: flex;
+                  align-items: center;
+                  gap: 6px;
+                  padding: 6px 12px;
+                  background: ${info.color}15;
+                  border-left: 3px solid ${info.color};
+                  border-radius: 4px;
+                  font-size: 13px;
+                ">
+                  <span>${info.emoji}</span>
+                  <span>${info.label}: ${count}</span>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        `;
+        container.appendChild(card);
+      });
+
+      if (container.children.length === 0) {
+        container.innerHTML = '<p style="color: #999;">No comprehension data yet. Start reading to see analytics!</p>';
+      }
+    }
+
+    // ============================================================================
+    // RENDER DOCUMENTS
+    // ============================================================================
+
+    function renderDocuments(documents, assignments) {
+      const container = document.getElementById('documentsList');
+
+      if (!documents || documents.length === 0) {
+        container.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-state-icon">📄</div>
+            <h3>No documents yet</h3>
+            <p>Upload your first compliance document to get started.</p>
+            <br>
+            <button class="button" onclick="window.location.href='upload.html'">
+              Upload Document
+            </button>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = documents.map(doc => {
+        // Get assignments for this document
+        const docAssignments = assignments.filter(a => a.document_id === doc.id);
+        const completed = docAssignments.filter(a => a.status === 'completed').length;
+        const total = docAssignments.length;
+        const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
+
+        return `
+          <div class="document-card">
+            <div class="document-title">${doc.title}</div>
+            <div class="document-meta">
+              <span>${doc.category || 'General'}</span>
+              <span>•</span>
+              <span>${doc.total_pages || 0} pages</span>
+              <span>•</span>
+              <span>Uploaded ${new Date(doc.created_at).toLocaleDateString()}</span>
+            </div>
+            ${total > 0 ? `
+              <div class="progress-bar">
+                <div class="progress-fill" style="width: ${percentage}%"></div>
+              </div>
+              <div class="progress-text">
+                <span>${completed} of ${total} completed</span>
+                <span>${percentage}%</span>
+              </div>
+            ` : `
+              <div class="progress-text">
+                <span style="color: #999;">No assignments yet</span>
+              </div>
+            `}
+          </div>
+        `;
+      }).join('');
+    }
+
+    // ============================================================================
+    // INITIALIZE
+    // ============================================================================
+
+    // Load dashboard when page loads
+    document.addEventListener('DOMContentLoaded', () => {
+      console.log('🚀 Dashboard initializing...');
+      
+      // Wait a moment for Supabase CDN to load, then initialize
+      setTimeout(() => {
+        if (initSupabase()) {
+          // Then load dashboard data
+          loadDashboard();
+        }
+      }, 100);
+    });
+  </script>
+</body>
+</html>
