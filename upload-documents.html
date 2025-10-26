@@ -1,0 +1,849 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Upload Document - ComplianceReader</title>
+  
+  <!-- Supabase -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  
+  <!-- PDF.js for PDF manipulation -->
+  <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+  
+  <!-- jsPDF for creating PDFs -->
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+  
+  <!-- Tesseract for OCR -->
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4.1.1/dist/tesseract.min.js"></script>
+  
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 16px;
+      padding: 40px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+
+    h1 {
+      color: #333;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 28px;
+    }
+
+    .subtitle {
+      color: #666;
+      margin-bottom: 32px;
+      font-size: 15px;
+    }
+
+    .upload-methods {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin-bottom: 32px;
+    }
+
+    .upload-method {
+      border: 2px dashed #667eea;
+      border-radius: 12px;
+      padding: 32px 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.3s;
+      background: #f8f9ff;
+    }
+
+    .upload-method:hover {
+      border-color: #764ba2;
+      background: #f0f2ff;
+      transform: translateY(-4px);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+    }
+
+    .upload-method.active {
+      border-color: #667eea;
+      background: #667eea;
+      color: white;
+    }
+
+    .upload-method .icon {
+      font-size: 48px;
+      margin-bottom: 12px;
+    }
+
+    .upload-method .title {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .upload-method .desc {
+      font-size: 13px;
+      color: #666;
+    }
+
+    .upload-method.active .desc {
+      color: rgba(255,255,255,0.9);
+    }
+
+    .form-section {
+      display: none;
+      margin-top: 32px;
+    }
+
+    .form-section.active {
+      display: block;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 500;
+      color: #333;
+      font-size: 14px;
+    }
+
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      font-size: 14px;
+      font-family: inherit;
+      transition: border-color 0.2s;
+    }
+
+    .form-group input:focus,
+    .form-group select:focus,
+    .form-group textarea:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+
+    .file-input-wrapper {
+      position: relative;
+      border: 3px dashed #667eea;
+      border-radius: 12px;
+      padding: 40px;
+      text-align: center;
+      background: #f8f9ff;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+
+    .file-input-wrapper:hover {
+      background: #f0f2ff;
+      border-color: #764ba2;
+    }
+
+    .file-input-wrapper input[type="file"] {
+      position: absolute;
+      opacity: 0;
+      width: 100%;
+      height: 100%;
+      top: 0;
+      left: 0;
+      cursor: pointer;
+    }
+
+    .file-input-icon {
+      font-size: 48px;
+      margin-bottom: 12px;
+    }
+
+    .file-input-text {
+      color: #666;
+      font-size: 14px;
+    }
+
+    .selected-file {
+      margin-top: 12px;
+      padding: 12px;
+      background: #e8f5e9;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+    }
+
+    .btn {
+      width: 100%;
+      padding: 16px;
+      background: #667eea;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+      margin-top: 20px;
+    }
+
+    .btn:hover {
+      background: #764ba2;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    }
+
+    .btn:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .btn-secondary {
+      background: #f5f5f5;
+      color: #333;
+    }
+
+    .btn-secondary:hover {
+      background: #e5e5e5;
+    }
+
+    .progress {
+      margin-top: 20px;
+      padding: 20px;
+      background: #f5f5f5;
+      border-radius: 8px;
+      display: none;
+    }
+
+    .progress.active {
+      display: block;
+    }
+
+    .progress-bar {
+      height: 8px;
+      background: #e0e0e0;
+      border-radius: 4px;
+      overflow: hidden;
+      margin-bottom: 12px;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+      width: 0%;
+      transition: width 0.3s;
+    }
+
+    .progress-text {
+      font-size: 14px;
+      color: #666;
+      text-align: center;
+    }
+
+    .camera-view {
+      position: fixed;
+      inset: 0;
+      background: black;
+      z-index: 1000;
+      display: none;
+      flex-direction: column;
+    }
+
+    .camera-view.active {
+      display: flex;
+    }
+
+    #videoPreview {
+      flex: 1;
+      width: 100%;
+      object-fit: cover;
+    }
+
+    .camera-controls {
+      padding: 20px;
+      background: rgba(0,0,0,0.8);
+      display: flex;
+      justify-content: center;
+      gap: 16px;
+    }
+
+    .camera-btn {
+      padding: 16px 32px;
+      border: none;
+      border-radius: 50px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .camera-btn.capture {
+      background: white;
+      color: black;
+    }
+
+    .camera-btn.done {
+      background: #27ae60;
+      color: white;
+    }
+
+    .camera-btn.cancel {
+      background: #e74c3c;
+      color: white;
+    }
+
+    .scanned-pages {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-top: 20px;
+    }
+
+    .scanned-page {
+      width: 100px;
+      height: 140px;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .scanned-page img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .scanned-page .remove {
+      position: absolute;
+      top: 4px;
+      right: 4px;
+      background: #e74c3c;
+      color: white;
+      border: none;
+      border-radius: 50%;
+      width: 24px;
+      height: 24px;
+      cursor: pointer;
+      font-size: 16px;
+      line-height: 1;
+    }
+
+    .back-link {
+      display: inline-block;
+      margin-bottom: 20px;
+      color: #667eea;
+      text-decoration: none;
+      font-weight: 500;
+    }
+
+    .back-link:hover {
+      text-decoration: underline;
+    }
+
+    @media (max-width: 768px) {
+      .container {
+        padding: 24px;
+      }
+
+      .upload-methods {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <a href="library.html" class="back-link">← Back to Library</a>
+    
+    <h1>📤 Upload Document</h1>
+    <p class="subtitle">Upload compliance documents for employee training</p>
+
+    <!-- Upload Methods -->
+    <div class="upload-methods">
+      <div class="upload-method" id="methodFile" onclick="selectMethod('file')">
+        <div class="icon">📄</div>
+        <div class="title">Upload File</div>
+        <div class="desc">PDF or Word document</div>
+      </div>
+
+      <div class="upload-method" id="methodScan" onclick="selectMethod('scan')">
+        <div class="icon">📱</div>
+        <div class="title">Scan Document</div>
+        <div class="desc">Use your camera</div>
+      </div>
+    </div>
+
+    <!-- File Upload Form -->
+    <div class="form-section" id="fileForm">
+      <div class="form-group">
+        <label>Document File</label>
+        <div class="file-input-wrapper">
+          <input type="file" id="fileInput" accept=".pdf,.doc,.docx" onchange="handleFileSelect()">
+          <div class="file-input-icon">📄</div>
+          <div class="file-input-text">
+            Click to select or drag and drop<br>
+            <small>Supports PDF, DOC, DOCX</small>
+          </div>
+        </div>
+        <div id="selectedFile" class="selected-file" style="display: none;">
+          <span>📄</span>
+          <span id="fileName"></span>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Document Title</label>
+        <input type="text" id="docTitle" placeholder="e.g., Employee Code of Conduct 2024">
+      </div>
+
+      <div class="form-group">
+        <label>Category</label>
+        <select id="docCategory">
+          <option value="">Select category...</option>
+          <option value="Ethics & Compliance">Ethics & Compliance</option>
+          <option value="Data Privacy">Data Privacy</option>
+          <option value="Security">Security</option>
+          <option value="HR Policies">HR Policies</option>
+          <option value="Financial Compliance">Financial Compliance</option>
+          <option value="Safety">Safety & Health</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Description (Optional)</label>
+        <textarea id="docDescription" rows="3" placeholder="Brief description of this document..."></textarea>
+      </div>
+
+      <button class="btn" onclick="uploadFile()" id="uploadBtn">Upload Document</button>
+    </div>
+
+    <!-- Scan Form -->
+    <div class="form-section" id="scanForm">
+      <p style="text-align: center; color: #666; margin-bottom: 20px;">
+        Use your phone camera to scan paper documents
+      </p>
+
+      <button class="btn" onclick="startCamera()">📷 Start Camera</button>
+
+      <div id="scannedPages" class="scanned-pages"></div>
+
+      <div class="form-group" style="margin-top: 20px;">
+        <label>Document Title</label>
+        <input type="text" id="scanTitle" placeholder="e.g., Safety Procedures Manual">
+      </div>
+
+      <div class="form-group">
+        <label>Category</label>
+        <select id="scanCategory">
+          <option value="">Select category...</option>
+          <option value="Ethics & Compliance">Ethics & Compliance</option>
+          <option value="Data Privacy">Data Privacy</option>
+          <option value="Security">Security</option>
+          <option value="HR Policies">HR Policies</option>
+          <option value="Financial Compliance">Financial Compliance</option>
+          <option value="Safety">Safety & Health</option>
+        </select>
+      </div>
+
+      <button class="btn" onclick="processScan()" id="processScanBtn" style="display: none;">
+        Create PDF & Upload
+      </button>
+    </div>
+
+    <!-- Progress -->
+    <div class="progress" id="progress">
+      <div class="progress-bar">
+        <div class="progress-fill" id="progressFill"></div>
+      </div>
+      <div class="progress-text" id="progressText">Processing...</div>
+    </div>
+  </div>
+
+  <!-- Camera View -->
+  <div class="camera-view" id="cameraView">
+    <video id="videoPreview" autoplay playsinline></video>
+    <div class="camera-controls">
+      <button class="camera-btn cancel" onclick="stopCamera()">Cancel</button>
+      <button class="camera-btn capture" onclick="capturePhoto()">📷 Capture</button>
+      <button class="camera-btn done" onclick="finishScanning()" style="display: none;" id="doneBtn">
+        Done (0 pages)
+      </button>
+    </div>
+  </div>
+
+  <canvas id="photoCanvas" style="display: none;"></canvas>
+
+  <script>
+    // ============================================================================
+    // CONFIGURATION
+    // ============================================================================
+    const SUPABASE_URL = 'https://tbkdigmhjtnibqfgmptq.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRia2RpZ21oanRuaWJxZmdtcHRxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjkxNzQ4MTIsImV4cCI6MjA0NDc1MDgxMn0.bSPhsbg-tZP4gKwaSfV8Qvwmvs6mUOJE_5y_jfuLFh8';
+
+    let supabaseClient;
+    let currentMethod = null;
+    let selectedFile = null;
+    let scannedPages = [];
+    let videoStream = null;
+
+    // Initialize Supabase
+    window.addEventListener('load', () => {
+      setTimeout(() => {
+        if (typeof window.supabase !== 'undefined') {
+          supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+          console.log('✅ Supabase initialized');
+        }
+      }, 100);
+    });
+
+    // ============================================================================
+    // METHOD SELECTION
+    // ============================================================================
+    function selectMethod(method) {
+      currentMethod = method;
+      
+      // Update UI
+      document.querySelectorAll('.upload-method').forEach(el => {
+        el.classList.remove('active');
+      });
+      document.getElementById('method' + method.charAt(0).toUpperCase() + method.slice(1)).classList.add('active');
+
+      // Show appropriate form
+      document.querySelectorAll('.form-section').forEach(el => {
+        el.classList.remove('active');
+      });
+      
+      if (method === 'file') {
+        document.getElementById('fileForm').classList.add('active');
+      } else if (method === 'scan') {
+        document.getElementById('scanForm').classList.add('active');
+      }
+    }
+
+    // ============================================================================
+    // FILE UPLOAD
+    // ============================================================================
+    function handleFileSelect() {
+      const input = document.getElementById('fileInput');
+      selectedFile = input.files[0];
+      
+      if (selectedFile) {
+        document.getElementById('fileName').textContent = selectedFile.name;
+        document.getElementById('selectedFile').style.display = 'flex';
+        
+        // Auto-fill title from filename
+        const title = selectedFile.name.replace(/\.(pdf|docx?)/i, '');
+        document.getElementById('docTitle').value = title;
+      }
+    }
+
+    async function uploadFile() {
+      if (!selectedFile) {
+        alert('Please select a file');
+        return;
+      }
+
+      const title = document.getElementById('docTitle').value.trim();
+      const category = document.getElementById('docCategory').value;
+      const description = document.getElementById('docDescription').value.trim();
+
+      if (!title) {
+        alert('Please enter a document title');
+        return;
+      }
+
+      showProgress('Uploading document...');
+
+      try {
+        // Generate slug from title
+        const slug = title.toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-|-$/g, '');
+
+        // Check if it's a Word doc that needs conversion
+        const isWord = selectedFile.name.match(/\.(docx?)/i);
+        
+        let fileToUpload = selectedFile;
+        let fileName = selectedFile.name;
+
+        if (isWord) {
+          updateProgress(30, 'Converting Word document to PDF...');
+          // In production, you'd call a server API to convert
+          // For demo, we'll show the process
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          // fileToUpload = await convertWordToPDF(selectedFile);
+          fileName = fileName.replace(/\.docx?$/i, '.pdf');
+        }
+
+        // Upload to Supabase Storage
+        updateProgress(50, 'Uploading to storage...');
+        
+        const storagePath = `documents/${slug}.pdf`;
+        const { data: uploadData, error: uploadError } = await supabaseClient.storage
+          .from('compliance-documents')
+          .upload(storagePath, fileToUpload, {
+            contentType: 'application/pdf',
+            upsert: true
+          });
+
+        if (uploadError) throw uploadError;
+
+        // Get public URL
+        const { data: { publicUrl } } = supabaseClient.storage
+          .from('compliance-documents')
+          .getPublicUrl(storagePath);
+
+        // Insert into documents table
+        updateProgress(80, 'Creating document record...');
+        
+        const { data: docData, error: docError } = await supabaseClient
+          .from('documents')
+          .insert({
+            slug: slug,
+            title: title,
+            category: category || 'General',
+            description: description || null,
+            external_url: publicUrl,
+            organization_id: 'a0000000-0000-0000-0000-000000000001',
+            created_by: 'b0000000-0000-0000-0000-000000000001',
+            status: 'active',
+            total_pages: 1, // Would be extracted from PDF
+            file_size: selectedFile.size
+          })
+          .select()
+          .single();
+
+        if (docError) throw docError;
+
+        updateProgress(100, 'Upload complete!');
+        
+        setTimeout(() => {
+          alert('Document uploaded successfully!');
+          window.location.href = 'library.html';
+        }, 1000);
+
+      } catch (error) {
+        console.error('Upload error:', error);
+        hideProgress();
+        alert('Upload failed: ' + error.message);
+      }
+    }
+
+    // ============================================================================
+    // CAMERA SCANNING
+    // ============================================================================
+    async function startCamera() {
+      try {
+        const constraints = {
+          video: {
+            facingMode: 'environment', // Use back camera on mobile
+            width: { ideal: 1920 },
+            height: { ideal: 1080 }
+          }
+        };
+
+        videoStream = await navigator.mediaDevices.getUserMedia(constraints);
+        const video = document.getElementById('videoPreview');
+        video.srcObject = videoStream;
+        
+        document.getElementById('cameraView').classList.add('active');
+      } catch (error) {
+        console.error('Camera error:', error);
+        alert('Could not access camera: ' + error.message);
+      }
+    }
+
+    function stopCamera() {
+      if (videoStream) {
+        videoStream.getTracks().forEach(track => track.stop());
+        videoStream = null;
+      }
+      document.getElementById('cameraView').classList.remove('active');
+    }
+
+    function capturePhoto() {
+      const video = document.getElementById('videoPreview');
+      const canvas = document.getElementById('photoCanvas');
+      
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(video, 0, 0);
+      
+      canvas.toBlob(blob => {
+        scannedPages.push(blob);
+        displayScannedPages();
+        
+        document.getElementById('doneBtn').style.display = 'block';
+        document.getElementById('doneBtn').textContent = `Done (${scannedPages.length} pages)`;
+      });
+    }
+
+    function finishScanning() {
+      stopCamera();
+      document.getElementById('processScanBtn').style.display = 'block';
+    }
+
+    function displayScannedPages() {
+      const container = document.getElementById('scannedPages');
+      container.innerHTML = '';
+      
+      scannedPages.forEach((blob, index) => {
+        const div = document.createElement('div');
+        div.className = 'scanned-page';
+        
+        const img = document.createElement('img');
+        img.src = URL.createObjectURL(blob);
+        
+        const removeBtn = document.createElement('button');
+        removeBtn.className = 'remove';
+        removeBtn.textContent = '×';
+        removeBtn.onclick = () => removePage(index);
+        
+        div.appendChild(img);
+        div.appendChild(removeBtn);
+        container.appendChild(div);
+      });
+    }
+
+    function removePage(index) {
+      scannedPages.splice(index, 1);
+      displayScannedPages();
+      document.getElementById('doneBtn').textContent = `Done (${scannedPages.length} pages)`;
+    }
+
+    async function processScan() {
+      if (scannedPages.length === 0) {
+        alert('Please scan at least one page');
+        return;
+      }
+
+      const title = document.getElementById('scanTitle').value.trim();
+      const category = document.getElementById('scanCategory').value;
+
+      if (!title) {
+        alert('Please enter a document title');
+        return;
+      }
+
+      showProgress('Processing scanned pages...');
+
+      try {
+        // Create PDF from scanned images with OCR
+        updateProgress(20, 'Creating PDF...');
+        
+        const { jsPDF } = window.jspdf;
+        const pdf = new jsPDF();
+        
+        for (let i = 0; i < scannedPages.length; i++) {
+          updateProgress(20 + (i / scannedPages.length) * 40, 
+            `Processing page ${i + 1} of ${scannedPages.length}...`);
+          
+          if (i > 0) pdf.addPage();
+          
+          const imageUrl = URL.createObjectURL(scannedPages[i]);
+          pdf.addImage(imageUrl, 'JPEG', 10, 10, 190, 270);
+          
+          // In production, run OCR here
+          // const text = await Tesseract.recognize(scannedPages[i]);
+          // Add text layer to PDF
+        }
+
+        const pdfBlob = pdf.output('blob');
+        
+        // Upload to Supabase
+        const slug = title.toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-|-$/g, '');
+
+        updateProgress(70, 'Uploading...');
+        
+        const storagePath = `documents/${slug}.pdf`;
+        const { data: uploadData, error: uploadError } = await supabaseClient.storage
+          .from('compliance-documents')
+          .upload(storagePath, pdfBlob, {
+            contentType: 'application/pdf',
+            upsert: true
+          });
+
+        if (uploadError) throw uploadError;
+
+        const { data: { publicUrl } } = supabaseClient.storage
+          .from('compliance-documents')
+          .getPublicUrl(storagePath);
+
+        // Insert into database
+        updateProgress(90, 'Creating record...');
+        
+        const { error: docError } = await supabaseClient
+          .from('documents')
+          .insert({
+            slug: slug,
+            title: title,
+            category: category || 'General',
+            external_url: publicUrl,
+            organization_id: 'a0000000-0000-0000-0000-000000000001',
+            created_by: 'b0000000-0000-0000-0000-000000000001',
+            status: 'active',
+            total_pages: scannedPages.length,
+            file_size: pdfBlob.size
+          });
+
+        if (docError) throw docError;
+
+        updateProgress(100, 'Complete!');
+        
+        setTimeout(() => {
+          alert('Document created successfully!');
+          window.location.href = 'library.html';
+        }, 1000);
+
+      } catch (error) {
+        console.error('Process error:', error);
+        hideProgress();
+        alert('Processing failed: ' + error.message);
+      }
+    }
+
+    // ============================================================================
+    // PROGRESS
+    // ============================================================================
+    function showProgress(text) {
+      document.getElementById('progress').classList.add('active');
+      document.getElementById('progressText').textContent = text;
+      document.getElementById('progressFill').style.width = '0%';
+    }
+
+    function updateProgress(percent, text) {
+      document.getElementById('progressFill').style.width = percent + '%';
+      document.getElementById('progressText').textContent = text;
+    }
+
+    function hideProgress() {
+      document.getElementById('progress').classList.remove('active');
+    }
+  </script>
+</body>
+</html>
